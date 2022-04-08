@@ -1,0 +1,15 @@
+defaults:
+  - _self_
+
+id: null
+seed: 0
+num_predictives: 100
+posterior: null
+cores: 1
+
+hydra:
+  run:
+    dir: ../results/${id}/evaluation/${now:%Y_%m_%d}__${now:%H_%M_%S}__${posterior}
+  sweep:
+    dir: ../results/${id}/evaluation/${now:%Y_%m_%d}__${now:%H_%M_%S}__multirun
+    subdir: ${hydra.job.num}__${posterior}
