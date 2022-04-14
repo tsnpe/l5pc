@@ -12,21 +12,23 @@ import pandas as pd
 
 # These files live in utils because I otherwise had problems with SLURM and
 # multiprocessing. See this error: https://www.pythonanywhere.com/forums/topic/27818/
-from multicompartment.utils import (
+from l5pc.utils.simulation_utils import (
     assemble_prior,
     assemble_simulator,
     assemble_db,
     write_to_dj,
 )
-from multicompartment.utils.common_utils import load_posterior
-from multicompartment.models.l5pc.utils import return_gt, return_names, return_xo
-from sbi.utils import PosteriorSupport, BoxUniform
+from l5pc.utils.common_utils import load_posterior
+from l5pc.model.utils import return_gt, return_names, return_xo
+from sbi.utils import BoxUniform
+from sbi.utils.support_posterior import PosteriorSupport
 
 log = logging.getLogger(__name__)
 
 
-@hydra.main(config_path="config", config_name="model")
+@hydra.main(config_path="config", config_name="sim_model")
 def sample_and_simulate(cfg: DictConfig) -> None:
+    print(cfg)
     start_time = time.time()
     log.debug(f"Starting run! {time.time() - start_time}")
 
@@ -50,18 +52,18 @@ def sample_and_simulate(cfg: DictConfig) -> None:
         proposal = prior
         round_ = 1
     else:
-        _, posterior, _ = load_posterior(cfg.id, cfg.proposal)
-        round_ = posterior.trained_rounds + 1
+        inference, posterior, _ = load_posterior(cfg.id, cfg.proposal)
+        round_ = inference[0]._round + 2
         log.debug(f"Loaded posterior, round", round_)
         if cfg.thr_proposal:
             _ = torch.manual_seed(0)  # Set seed=0 only for building the proposal.
             proposal = PosteriorSupport(
                 prior=prior.prior_torch,
                 posterior=posterior,
-                num_samples_to_estimate_support=10000,
-                allowed_false_negatives=0.001,
-                use_constrained_prior=True,
-                constrained_prior_quanitle=0.001,
+                num_samples_to_estimate_support=cfg.num_samples_to_estimate_support,
+                allowed_false_negatives=cfg.allowed_false_negatives,
+                use_constrained_prior=cfg.use_constrained_prior,
+                constrained_prior_quanitle=cfg.constrained_prior_quanitle,
             )
             log.debug("Built support")
             _ = torch.manual_seed(seed)

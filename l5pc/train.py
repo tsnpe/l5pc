@@ -1,35 +1,33 @@
-import os
 from os.path import join
-from itertools import chain
 
 from copy import deepcopy
 import torch
 from sbi.inference import SNPE, SNLE
 from sbi.utils import BoxUniform, posterior_nn, likelihood_nn, handle_invalid_x
 import numpy as np
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 import hydra
-from hydra.utils import get_original_cwd, to_absolute_path
 import pandas as pd
 import pickle
 import dill
-from multicompartment.utils.common_utils import load_prior
-from multicompartment.models.l5pc import L5PC_20D_theta, L5PC_20D_x
-from multicompartment.models.l5pc.utils import return_names, return_x_names
-from torch.distributions import MultivariateNormal
+from l5pc.utils.common_utils import load_prior
+from l5pc.model import L5PC_20D_theta, L5PC_20D_x
+from l5pc.model.utils import return_names, return_x_names, return_xo
 from torch import zeros, eye, tensor, float32, as_tensor, Tensor
-from multicompartment.models.l5pc.utils import return_xo
-from multicompartment.utils.model_utils import (
+from l5pc.utils.model_utils import (
     replace_nan,
     add_observation_noise,
 )
+import logging
+
+log = logging.getLogger("train")
 
 
-@hydra.main(config_path="config", config_name="algorithm")
+@hydra.main(config_path="config", config_name="train")
 def train(cfg: DictConfig) -> None:
     assert cfg.id is not None, "Specify an ID. Format: [model][dim]_[run], e.g. j2_3"
 
-    base_path = "/mnt/qb/macke/mdeistler57/multicompartment"
+    base_path = "/mnt/qb/macke/mdeistler57/tsnpe_collection/l5pc"
     inference_path = join(base_path, f"results/{cfg.id}/inference")
 
     if cfg.previous_inference is None:
@@ -44,26 +42,32 @@ def train(cfg: DictConfig) -> None:
         # +1 because in multicompartment we start counting at 1
         # +1 because the counter for inference is only set after the data is passed
         round_ = previous_inferences[0].trained_rounds + 1
-    print("Round: ", round_)
+    log.info(f"Round: {round_}")
 
     x_db = L5PC_20D_x()
     theta_db = L5PC_20D_theta()
 
     data_id = cfg.id if round_ > 1 else "l20_0"
     theta = as_tensor(
-        (theta_db & {"round": round_} & {"id": data_id}).fetch(*return_names()),
+        np.asarray(
+            (theta_db & {"round": round_} & {"id": data_id}).fetch(*return_names())
+        ),
         dtype=float32,
     ).T
     x = as_tensor(
-        (x_db & {"round": round_} & {"id": data_id}).fetch(*return_x_names()),
+        np.asarray(
+            (x_db & {"round": round_} & {"id": data_id}).fetch(*return_x_names())
+        ),
         dtype=float32,
     ).T
+    theta = theta[: cfg.num_initial]
+    x = x[: cfg.num_initial]
 
     # Extract prior from the config file of the simulations.
     prior = load_prior(data_id)
 
-    print("theta dim after loading id: ", theta.shape)
-    print("x dim after loading id: ", x.shape)
+    log.info("theta dim after loading id: {theta.shape}")
+    log.info("x dim after loading id: {x.shape}")
 
     if cfg.algorithm.name == "snpe":
         method = SNPE
@@ -85,11 +89,11 @@ def train(cfg: DictConfig) -> None:
         features_to_keep = [f for f in valid_features if f not in previous_feature_list]
     else:
         raise NameError
-    x_only_good_features = x[:, features_to_keep]
     with open("used_features.pkl", "wb") as handle:
         pickle.dump(features_to_keep, handle)
 
-    is_valid_x, _, _ = handle_invalid_x(x_only_good_features, True)
+    # x_only_good_features = x[:, features_to_keep]
+    # is_valid_x, _, _ = handle_invalid_x(x_only_good_features, True)
     if cfg.replace_nan_values or cfg.train_on_all:
         x, replacement_values = replace_nan(x)
         x = add_observation_noise(
@@ -99,8 +103,9 @@ def train(cfg: DictConfig) -> None:
             std_type=cfg.observation_noise_type,
             subset=None,
         )
+        x = x[:, features_to_keep]
     else:
-        x = x_only_good_features
+        x = x[:, features_to_keep]
         x = add_observation_noise(
             x=x,
             id_=cfg.id,
@@ -108,18 +113,20 @@ def train(cfg: DictConfig) -> None:
             std_type=cfg.observation_noise_type,
             subset=features_to_keep,
         )
-    if not cfg.train_on_all:
-        x = x[is_valid_x]
-        theta = theta[is_valid_x]
+    # if not cfg.train_on_all:
+    #     x = x[is_valid_x]
+    #     theta = theta[is_valid_x]
 
     if cfg.num_train is not None:
         theta = theta[: cfg.num_train]
         x = x[: cfg.num_train]
 
-    print("Selected features: ", features_to_keep)
-    print("Names of selected features", np.asarray(return_x_names())[features_to_keep])
-    print("theta dim to train: ", theta.shape)
-    print("x dim to train: ", x.shape)
+    log.info(f"Selected features: {features_to_keep}")
+    log.info(
+        f"Names of selected features {np.asarray(return_x_names())[features_to_keep]}"
+    )
+    log.info(f"theta dim to train: {theta.shape}")
+    log.info(f"x dim to train: {x.shape}")
 
     inferences = []
     for seed in range(cfg.ensemble_size):
@@ -136,17 +143,17 @@ def train(cfg: DictConfig) -> None:
         if cfg.previous_inference is not None and not cfg.load_nn_from_prev_inference:
             inference.trained_rounds = round_
         inferences.append(inference)
-        print("_best_val_log_prob", inference._best_val_log_prob)
+        log.info(f"_best_val_log_prob {inference._best_val_log_prob}")
 
     xo_all = return_xo(as_pd=False)[0]
     xo_all = as_tensor(xo_all, dtype=float32)
-    if cfg.replace_nan_values or cfg.temper_xo or cfg.train_on_all:
+    if cfg.replace_nan_values or cfg.temper_xo:
         xo = deepcopy(replacement_values)
         xo[features_to_keep] = xo_all[features_to_keep]
     else:
         xo = xo_all[features_to_keep]
     xo = xo.unsqueeze(0)
-    print("xo", xo.shape)
+    log.info(f"xo {xo.shape}")
     with open("xo.pkl", "wb") as handle:
         pickle.dump(xo, handle)
 
@@ -170,3 +177,7 @@ def select_features(x: Tensor, nan_fraction_threshold_to_exclude: float):
     )
     often_valid_features = np.arange(len(condition_features))[condition_features]
     return often_valid_features
+
+
+if __name__ == "__main__":
+    train()

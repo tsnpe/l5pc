@@ -1,7 +1,7 @@
 from multiprocessing import Pool
 from os.path import join
 from copy import deepcopy
-
+from tqdm import tqdm
 from torch import tensor, as_tensor, Tensor, eye, zeros, ones, float32
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -210,45 +210,41 @@ def coverage(
     used_features,
     num_x: int = 100,
     alpha=torch.linspace(0, 1, 50),
-    num_monte_carlo: int = 10_000,
-    plot: bool = False,
+    num_monte_carlo: int = 1_000,
 ):
-    alpha_trunc = alpha[1:-1:1]
     posterior = deepcopy(posterior)
-    gt_is_covered = zeros(alpha_trunc.shape)
-    num_bins = 100
-    theta = theta.to_numpy()
-    x = x.to_numpy()
+    gt_is_covered = zeros(alpha.shape)
+    theta = theta.numpy()
+    x = x.numpy()
     x = x[:, used_features]
     nonan = np.invert(np.any(np.isnan(x), axis=1))
     x = x[nonan]
     theta = theta[nonan]
     x = x[:num_x]
     theta = theta[:num_x]
-    for params, summstats in zip(theta, x):
-        xo = as_tensor(np.asarray([summstats]), dtype=float32)
-        posterior.set_default_x(xo)
-        lprobs = posterior.log_prob(
-            posterior.sample((num_monte_carlo,), show_progress_bars=False)
-        )
-        min_prob = torch.min(lprobs)
-        max_prob = torch.max(lprobs)
-        xvals = torch.linspace(min_prob, max_prob, num_bins)
-        hist = torch.histc(lprobs, bins=num_bins, min=min_prob, max=max_prob)
-        cumhist = torch.cumsum(hist, dim=0) / torch.sum(hist)
-        inds = torch.argmax((cumhist > alpha_trunc.unsqueeze(1)).int(), dim=1)
-        thresholds = xvals[inds]
-        gt_log_prob = posterior.log_prob(as_tensor(np.asarray([params]), dtype=float32))
-        if plot:
-            fig, ax = plt.subplots(1, 1, figsize=(4, 2))
-            ax.plot(xvals.numpy(), hist.numpy())
-            ax.axvline(gt_log_prob.numpy())
-            plt.show()
-        gt_is_covered += (gt_log_prob > thresholds).float()
+    with tqdm(total=len(theta)) as pbar:
+        for params, summstats in tqdm(zip(theta, x)):
+            xo = as_tensor(np.asarray([summstats]), dtype=float32)
+            posterior.set_default_x(xo)
+            lprobs = posterior.log_prob(
+                posterior.sample((num_monte_carlo,), show_progress_bars=False)
+            )
+            gt_log_prob = posterior.log_prob(
+                as_tensor(np.asarray([params]), dtype=float32)
+            )
+            rank_of_gt = compute_rank(gt_log_prob, lprobs)
+            norm_rank = rank_of_gt / lprobs.shape[0]
+            covered_in_alpha_quantile = norm_rank > alpha
+            gt_is_covered += covered_in_alpha_quantile.float()
+            pbar.update(1)
     gt_is_covered /= x.shape[0]
-    gt_is_covered = torch.cat([tensor([1.0]), gt_is_covered, tensor([0.0])])
     return alpha, torch.flip(gt_is_covered, dims=[0])
 
+def compute_rank(val: Tensor, vec: Tensor):
+    c = torch.cat([vec, val])
+    s = torch.argsort(c)
+    ind = torch.where(s == len(c) - 1)
+    return ind[0]  # .where returns a tuple
 
 def plot_coverage(alpha, gt_is_covered):
     fig, ax = plt.subplots(1, 1, figsize=(1.5, 1.5))

@@ -13,7 +13,7 @@ import pickle
 
 # These files live in utils because I otherwise had problems with SLURM and
 # multiprocessing. See this error: https://www.pythonanywhere.com/forums/topic/27818/
-from multicompartment.utils.evaluation_utils import (
+from l5pc.utils.evaluation_utils import (
     predictive_traces,
     plot_traces,
     plot_summstats,
@@ -22,15 +22,18 @@ from multicompartment.utils.evaluation_utils import (
     coverage,
     plot_coverage,
 )
-from multicompartment.utils.common_utils import (
+from l5pc.utils.model_utils import (
+    replace_nan,
+    add_observation_noise,
+)
+from l5pc.utils.common_utils import (
     load_prior,
     extract_bounds,
     load_posterior,
 )
-from multicompartment.models.l5pc.utils import return_gt, return_x_names, return_names
-from multicompartment.models.l5pc import L5PC_20D_theta, L5PC_20D_x
-from multicompartment.models import summstats_l5pc
-from sbi.utils import PosteriorSupport
+from l5pc.model.utils import return_gt, return_x_names, return_names
+from l5pc.model import L5PC_20D_theta, L5PC_20D_x, summstats_l5pc
+from sbi.utils.support_posterior import PosteriorSupport
 
 log = logging.getLogger(__name__)
 
@@ -39,7 +42,7 @@ log = logging.getLogger(__name__)
 def evaluate(cfg: DictConfig) -> None:
     _ = torch.manual_seed(cfg.seed)
     inference, posterior, used_features = load_posterior(cfg.id, cfg.posterior)
-    round_ = posterior.trained_rounds
+    round_ = inference[0]._round + 1
     log.info(f"Posterior after round: {round_}")
 
     prior = load_prior()
@@ -50,22 +53,24 @@ def evaluate(cfg: DictConfig) -> None:
     posterior_support = PosteriorSupport(
         prior=prior.prior_torch,
         posterior=posterior,
-        num_samples_to_estimate_support=10_000,
-        allowed_false_negatives=0.001,
-        use_constrained_prior=True,
-        constrained_prior_quanitle=0.001,
+        num_samples_to_estimate_support=cfg.num_samples_to_estimate_support,
+        allowed_false_negatives=cfg.allowed_false_negatives,
+        use_constrained_prior=cfg.use_constrained_prior,
+        constrained_prior_quanitle=cfg.constrained_prior_quanitle,
     )
 
+    log.info(f"Starting to simulate {cfg.num_predictives} predictive traces")
     traces, theta = predictive_traces(
         posterior=posterior, num_samples=cfg.num_predictives, num_cores=cfg.cores
     )
+    log.info(f"Finished simulating predictives")
     with open("traces.pkl", "wb") as handle:
         pickle.dump(traces, handle)
     theta.to_pickle("parameters.pkl")
 
     posterior_stats = summstats_l5pc(traces)
     valid = np.invert(np.any(np.isnan(posterior_stats.to_numpy()), axis=1))
-    log.info(f"Fraction of all all valid sims: {np.sum(valid) / cfg.num_predictives}")
+    log.info(f"Fraction of all valid sims: {np.sum(valid) / cfg.num_predictives}")
     posterior_stats.to_pickle("stats.pkl")
 
     x_db = L5PC_20D_x()
@@ -73,32 +78,43 @@ def evaluate(cfg: DictConfig) -> None:
 
     data_id = "l20_0" if round_ == 1 else cfg.id
     theta = as_tensor(
-        (theta_db & {"round": round_} & {"id": data_id}).fetch(*return_names()),
+        np.asarray(
+            (theta_db & {"round": round_} & {"id": data_id}).fetch(*return_names())
+        ),
         dtype=float32,
     ).T
     x = as_tensor(
-        (x_db & {"round": round_} & {"id": data_id}).fetch(*return_x_names()),
+        np.asarray(
+            (x_db & {"round": round_} & {"id": data_id}).fetch(*return_x_names())
+        ),
         dtype=float32,
     ).T
 
-    # x = np.asarray(x_db.fetch(*return_x_names())).T[:10000]
-    x = pd.DataFrame(x[:10000].numpy(), columns=return_x_names())
-    # theta = np.asarray(theta_db.fetch(*return_names())).T[:10000]
-    theta = pd.DataFrame(theta[:10000].numpy(), columns=return_names())
+    x_pd = pd.DataFrame(x[-10000:].numpy(), columns=return_x_names())
 
+    x = x[-1000:]
+    theta = theta[-1000:]
+    x, _ = replace_nan(x)
+    x = add_observation_noise(
+        x=x,
+        id_=cfg.id,
+        noise_multiplier=0.0,
+        std_type="data",
+        subset=None,
+    )
     alpha, cov = coverage(posterior, theta, x, used_features)
 
     with mpl.rc_context(
-        fname="/mnt/qb/macke/mdeistler57/multicompartment/multicompartment/.matplotlibrc"
+        fname="/mnt/qb/macke/mdeistler57/tsnpe_collection/l5pc/.matplotlibrc"
     ):
         plot_traces(traces)
         plt.savefig("traces.png", dpi=200, bbox_inches="tight")
         plt.show()
 
-        plot_summstats(posterior_stats, x)
+        plot_summstats(posterior_stats, x_pd)
         plt.savefig("stats.png", dpi=200, bbox_inches="tight")
         plt.show()
-        plot_summstats(posterior_stats, x, used_features=used_features)
+        plot_summstats(posterior_stats, x_pd, used_features=used_features)
         plt.savefig("stats_fitted.png", dpi=200, bbox_inches="tight")
         plt.show()
 

@@ -6,6 +6,10 @@ seed: 0
 num_predictives: 100
 posterior: null
 cores: 1
+num_samples_to_estimate_support: 10000
+allowed_false_negatives: 0.0
+use_constrained_prior: True
+constrained_prior_quanitle: 0.0
 
 hydra:
   run:
