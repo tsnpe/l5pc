@@ -41,7 +41,7 @@ def train(cfg: DictConfig) -> None:
             previous_inferences = dill.load(handle)
         # +1 because in multicompartment we start counting at 1
         # +1 because the counter for inference is only set after the data is passed
-        round_ = previous_inferences[0].trained_rounds + 1
+        round_ = previous_inferences[0]._round + 1 + 1
     log.info(f"Round: {round_}")
 
     x_db = L5PC_20D_x()
