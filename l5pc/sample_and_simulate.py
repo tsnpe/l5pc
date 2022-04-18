@@ -52,8 +52,8 @@ def sample_and_simulate(cfg: DictConfig) -> None:
         proposal = prior
         round_ = 1
     else:
-        inference, posterior, _ = load_posterior(cfg.id, cfg.proposal)
-        round_ = inference[0]._round + 2
+        inference, posterior, _, round_train = load_posterior(cfg.id, cfg.proposal)
+        round_ = round_train + 1
         log.debug(f"Loaded posterior, round", round_)
         if cfg.thr_proposal:
             _ = torch.manual_seed(0)  # Set seed=0 only for building the proposal.

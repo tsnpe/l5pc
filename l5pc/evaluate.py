@@ -41,8 +41,9 @@ log = logging.getLogger(__name__)
 @hydra.main(config_path="config", config_name="evaluation")
 def evaluate(cfg: DictConfig) -> None:
     _ = torch.manual_seed(cfg.seed)
-    inference, posterior, used_features = load_posterior(cfg.id, cfg.posterior)
-    round_ = inference[0]._round + 1
+    inference, posterior, used_features, round_ = load_posterior(cfg.id, cfg.posterior)
+
+    # round_ = inference[0]._round + 1
     log.info(f"Posterior after round: {round_}")
 
     prior = load_prior()

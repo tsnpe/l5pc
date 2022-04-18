@@ -18,6 +18,7 @@ from l5pc.utils.model_utils import (
     replace_nan,
     add_observation_noise,
 )
+from joblib import Parallel, delayed
 import logging
 
 log = logging.getLogger("train")
@@ -129,22 +130,27 @@ def train(cfg: DictConfig) -> None:
     log.info(f"theta dim to train: {theta.shape}")
     log.info(f"x dim to train: {x.shape}")
 
-    inferences = []
-    for seed in range(cfg.ensemble_size):
-        _ = torch.manual_seed(cfg.seed_train + seed)
-        if cfg.load_nn_from_prev_inference:
-            inference = previous_inferences[seed]
-        else:
-            inference = method(prior=prior.prior_torch, density_estimator=dens_estim)
-
-        _ = inference.append_simulations(theta, x).train(
-            max_num_epochs=cfg.max_num_epochs,
-            training_batch_size=cfg.training_batch_size,
+    inferences = Parallel(n_jobs=cfg.ensemble_size)(
+        delayed(train_given_seed)(
+            cfg, method, previous_inferences[seed], prior, dens_estim, theta, x, seed
         )
-        if cfg.previous_inference is not None and not cfg.load_nn_from_prev_inference:
-            inference.trained_rounds = round_
-        inferences.append(inference)
-        log.info(f"_best_val_log_prob {inference._best_val_log_prob}")
+        for seed in range(cfg.ensemble_size)
+    )
+    # for seed in range(cfg.ensemble_size):
+    #     _ = torch.manual_seed(cfg.seed_train + seed)
+    #     if cfg.load_nn_from_prev_inference:
+    #         inference = previous_inferences[seed]
+    #     else:
+    #         inference = method(prior=prior.prior_torch, density_estimator=dens_estim)
+
+    #     _ = inference.append_simulations(theta, x).train(
+    #         max_num_epochs=cfg.max_num_epochs,
+    #         training_batch_size=cfg.training_batch_size,
+    #     )
+    #     if cfg.previous_inference is not None and not cfg.load_nn_from_prev_inference:
+    #         inference.trained_rounds = round_
+    #     inferences.append(inference)
+    #     log.info(f"_best_val_log_prob {inference._best_val_log_prob}")
 
     xo_all = return_xo(as_pd=False)[0]
     xo_all = as_tensor(xo_all, dtype=float32)
@@ -171,6 +177,23 @@ def train(cfg: DictConfig) -> None:
         pickle.dump(all_val_log_probs, handle)
     np.savetxt("best_val_log_prob.txt", all_best_val, fmt="%10.10f")
     np.savetxt("epochs.txt", all_epochs, fmt="%5.5f")
+
+
+def train_given_seed(
+    cfg, method, previous_inferences_specific, prior, dens_estim, theta, x, seed
+):
+    _ = torch.manual_seed(cfg.seed_train + seed)
+    if cfg.load_nn_from_prev_inference:
+        inference = previous_inferences_specific
+    else:
+        inference = method(prior=prior.prior_torch, density_estimator=dens_estim)
+
+    _ = inference.append_simulations(theta, x).train(
+        max_num_epochs=cfg.max_num_epochs,
+        training_batch_size=cfg.training_batch_size,
+    )
+    log.info(f"_best_val_log_prob {inference._best_val_log_prob}")
+    return inference
 
 
 def select_features(x: Tensor, nan_fraction_threshold_to_exclude: float):

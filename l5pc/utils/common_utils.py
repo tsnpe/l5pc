@@ -42,7 +42,9 @@ def load_posterior(id: str, path: str):
         used_features = dill.load(handle)
     with open(join(inference_path, "xo.pkl"), "rb") as handle:
         xo = pickle.load(handle)
+    with open(join(inference_path, "round.pkl"), "rb") as handle:
+        round_ = pickle.load(handle)
     xo = as_tensor(xo[:, used_features], dtype=float32)
     posteriors = [infer.build_posterior() for infer in inferences]
     posterior = NeuralPosteriorEnsemble(posteriors=posteriors).set_default_x(xo)
-    return inferences, posterior, used_features
+    return inferences, posterior, used_features, round_
