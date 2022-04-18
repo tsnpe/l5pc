@@ -39,9 +39,10 @@ def train(cfg: DictConfig) -> None:
             previous_feature_list = pickle.load(handle)
         with open(join(prev_inference, "inference.pkl"), "rb") as handle:
             previous_inferences = dill.load(handle)
-        # +1 because in multicompartment we start counting at 1
-        # +1 because the counter for inference is only set after the data is passed
-        round_ = previous_inferences[0]._round + 1 + 1
+        # +1 for new round
+        with open(join(prev_inference, "round.pkl"), "rb") as handle:
+            round_ = pickle.load(handle) + 1
+        # round_ = previous_inferences[0]._round + 1 + 1
     log.info(f"Round: {round_}")
 
     x_db = L5PC_20D_x()
@@ -156,6 +157,9 @@ def train(cfg: DictConfig) -> None:
     log.info(f"xo {xo.shape}")
     with open("xo.pkl", "wb") as handle:
         pickle.dump(xo, handle)
+
+    with open("round.pkl", "wb") as handle:
+        pickle.dump(round_, handle)
 
     with open("inference.pkl", "wb") as handle:
         dill.dump(inferences, handle)
