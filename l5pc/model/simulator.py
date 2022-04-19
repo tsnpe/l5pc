@@ -18,7 +18,7 @@ from neuron import h
 
 def setup_l5pc(load_libraries: bool = True):
     # path = "/mnt/qb/macke/mdeistler57/multicompartment/multicompartment/models/l5pc/"
-    path = "/mnt/qb/macke/mdeistler57/tsnpe_collection/l5pc/l5pc/model/"
+    path = "/home/michael/Documents/tsnpe_collection/l5pc/l5pc/model/"
     # See https://www.neuron.yale.edu/phpBB/viewtopic.php?t=4283
     # Without this line, we can not run this file from a different directory.
     if load_libraries:
