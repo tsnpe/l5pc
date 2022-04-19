@@ -34,6 +34,7 @@ def train(cfg: DictConfig) -> None:
     if cfg.previous_inference is None:
         previous_feature_list = []
         round_ = 1
+        previous_inferences = [None] * cfg.ensemble_size
     else:
         prev_inference = join(inference_path, cfg.previous_inference)
         with open(join(prev_inference, "used_features.pkl"), "rb") as handle:
