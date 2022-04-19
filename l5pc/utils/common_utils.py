@@ -34,7 +34,7 @@ def extract_bounds(prior) -> Tensor:
 
 
 def load_posterior(id: str, path: str):
-    base_path = "/mnt/qb/macke/mdeistler57/tsnpe_collection/l5pc/"
+    base_path = "/home/michael/Documents/tsnpe_collection/l5pc/"
     inference_path = join(base_path, f"results/{id}/inference/{path}")
     with open(join(inference_path, "inference.pkl"), "rb") as handle:
         inferences = dill.load(handle)
