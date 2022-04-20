@@ -19,3 +19,10 @@ R3:
 - ensemble of 10 (with joblib)
 - path: 2022_04_19__10_27_01_snpe_m/0
 - evaluation run: 2022_04_19__10_56_46__multirun/0__2022_04_19__10_27_01_snpe_m/0
+
+R4:
+- 30k sims
+- 35 features
+- ensemble of 10 (with joblib)
+- path: 2022_04_19__20_55_09_snpe_m/0
+- evaluation run: 2022_04_19__21_41_14__multirun/0__2022_04_19__20_55_09_snpe_m/0
