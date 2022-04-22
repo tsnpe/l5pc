@@ -10,10 +10,10 @@
 text.usetex          : False
 mathtext.default     : regular
 
-font.family          : serif
-font.serif           : Arial, sans-serif
-font.sans-serif      : Arial, sans-serif
-font.cursive         : Arial, sans-serif
+font.family          : Arial
+font.serif           : Arial
+font.sans-serif      : Arial
+font.cursive         : Arial
 font.size            : 8
 figure.titlesize     : 8
 legend.fontsize      : 8
