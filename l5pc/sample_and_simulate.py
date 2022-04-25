@@ -9,6 +9,7 @@ import hydra
 
 import numpy as np
 import pandas as pd
+from joblib import Parallel, delayed
 
 # These files live in utils because I otherwise had problems with SLURM and
 # multiprocessing. See this error: https://www.pythonanywhere.com/forums/topic/27818/
@@ -73,9 +74,13 @@ def sample_and_simulate(cfg: DictConfig) -> None:
     while remaining_sims > 0:
         num_to_simulate = min(remaining_sims, cfg.sims_until_save)
         log.debug(f"num_to_simulate", num_to_simulate)
-        theta = proposal.sample((num_to_simulate,))
+        samples_list = Parallel(n_jobs=10)(
+            delayed(sample_n)(proposal, int(num_to_simulate / 10), seed + s)
+            for s in range(10)
+        )
+        theta = torch.cat(samples_list)
 
-        log.debug(f"Sampled proposal")
+        log.debug(f"Sampled proposal", theta.shape)
         if isinstance(theta, torch.Tensor):
             theta = pd.DataFrame(theta.numpy(), columns=return_names())
 
@@ -114,6 +119,12 @@ def sample_and_simulate(cfg: DictConfig) -> None:
         log.info(f"Written to dj {time.time() - start_time}")
 
         remaining_sims -= num_to_simulate
+
+
+def sample_n(proposal, num_samples, seed):
+    _ = torch.manual_seed(seed)
+    theta = proposal.sample((num_samples,))
+    return theta
 
 
 if __name__ == "__main__":

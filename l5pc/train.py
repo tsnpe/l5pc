@@ -192,6 +192,7 @@ def train_given_seed(
     _ = inference.append_simulations(theta, x).train(
         max_num_epochs=cfg.max_num_epochs,
         training_batch_size=cfg.training_batch_size,
+        stop_after_epochs=cfg.stop_after_epochs,
     )
     log.info(f"_best_val_log_prob {inference._best_val_log_prob}")
     return inference
