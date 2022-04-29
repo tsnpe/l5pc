@@ -8,36 +8,40 @@ from l5pc.model import L5PC_20D_theta, L5PC_20D_x
 from l5pc.model.utils import return_names, return_x_names
 from torch.distributions import MultivariateNormal
 from torch import zeros, eye, tensor, float32, as_tensor, Tensor
+import pandas as pd
 
 
 def add_observation_noise(
     x: Tensor, id_: str, noise_multiplier: float = 1.0, std_type="data", subset=None
 ):
     print("Adding observation noise according to ", std_type)
-    if std_type == "sims":
-        x_db = L5PC_20D_x()
-        x_r1 = as_tensor(
-            np.asarray(
-                (x_db & {"round": 1} & {"id": "l20_0"}).fetch(*return_x_names())
-            ),
-            dtype=float32,
-        ).T
-        x_r1_np = x_r1.numpy()
-        stds = as_tensor(np.nanstd(x_r1_np, axis=0) * noise_multiplier)
-    elif std_type == "data":
-        stds = experimental_stds()
+    if std_type != "no_noise":
+        if std_type == "sims":
+            x_db = L5PC_20D_x()
+            x_r1 = as_tensor(
+                np.asarray(
+                    (x_db & {"round": 1} & {"id": "l20_0"}).fetch(*return_x_names())
+                ),
+                dtype=float32,
+            ).T
+            x_r1_np = x_r1.numpy()
+            stds = as_tensor(np.nanstd(x_r1_np, axis=0) * noise_multiplier)
+        elif std_type == "data":
+            stds = experimental_stds()
+        else:
+            raise NameError
+
+        if subset is not None:
+            stds = stds[subset]
+        dim = len(stds)
+
+        variances = stds**2
+        noise = MultivariateNormal(zeros(dim), variances * eye(dim))
+        noise_samples = noise.sample((x.shape[0],))
+        assert noise_samples.shape == x.shape
+        return x + noise_samples
     else:
-        raise NameError
-
-    if subset is not None:
-        stds = stds[subset]
-    dim = len(stds)
-
-    variances = stds**2
-    noise = MultivariateNormal(zeros(dim), variances * eye(dim))
-    noise_samples = noise.sample((x.shape[0],))
-    assert noise_samples.shape == x.shape
-    return x + noise_samples
+        return x
 
 
 def experimental_stds() -> Tensor:
@@ -50,12 +54,18 @@ def experimental_stds() -> Tensor:
     return stds
 
 
-def replace_nan(x: Tensor, stds_outside_data: float = 2.0):
+def replace_nan(x: Tensor, stds_outside_data: float = 2.0, model="l5pc"):
     x_np = deepcopy(x.detach().numpy())
 
-    replacement_vals = get_replacement_vals(x.shape[0], x.shape[1], stds_outside_data)
+    if model == "l5pc":
+        replacement_vals = get_replacement_vals(
+            x.shape[0], x.shape[1], stds_outside_data
+        )
+    else:
+        replacement_vals = get_replacement_vals_pyloric(
+            x.shape[0], x.shape[1], stds_outside_data
+        )
     nan_vals = np.isnan(x_np)
-    print("Number of nan vals", np.sum(nan_vals, axis=1))
     x_np[nan_vals] = replacement_vals[nan_vals]
     return as_tensor(x_np), as_tensor(replacement_vals[0], dtype=float32)
 
@@ -78,6 +88,22 @@ def get_replacement_vals(
     x_std[9] = 10.0
     x_std[19] = 10.0
     x_std[29] = 10.0
+    replacement_vals = np.asarray([x_min - x_std * stds_outside_data])
+
+    replacement_vals = np.tile(replacement_vals, (batch, 1))
+    return replacement_vals[:, :x_dim]
+
+
+def get_replacement_vals_pyloric(
+    batch: int, x_dim: int, stds_outside_data: float
+) -> np.ndarray:
+    x_r0 = pd.read_pickle(
+        "/mnt/qb/macke/mdeistler57/tsnpe_collection/l5pc/results/p31_0/simulations/2022_04_29__12_24_12_pyloric_m/0/sims_x.pkl"
+    )
+    x_r0 = as_tensor(np.asarray(x_r0), dtype=float32)
+    x_r1_np = x_r0.numpy()
+    x_min = np.nanmin(x_r1_np, axis=0)
+    x_std = np.nanstd(x_r1_np, axis=0)
     replacement_vals = np.asarray([x_min - x_std * stds_outside_data])
 
     replacement_vals = np.tile(replacement_vals, (batch, 1))

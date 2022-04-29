@@ -1,5 +1,6 @@
 defaults:
   - algorithm: snpe
+  - model: l5pc
   - _self_
 
 id: null
@@ -19,6 +20,8 @@ ensemble_size: 10
 choose_features: "valid"
 replace_nan_values: True
 temper_xo: False
+data_path: null
+simulation_loaded_from_id: null
 
 hydra:
   run:

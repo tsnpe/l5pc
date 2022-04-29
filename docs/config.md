@@ -35,6 +35,8 @@
 - temper_xo: Used only if `replace_nan_values=True`. Then, if `temper_xo=True`, we set 
   those features of `xo` which have too many NaN values (according to `nan_fraction_threshold_to_exclude`) to 
   the replacement value
+- data_path: only used if `model=="pyloric"`. Then, this path is the path to the simulations that are used to train.
+- simulation_loaded_from_id: Allows to train on a different id than the id of the data. This can be useful for SNPE-C (because it works for any proposal).
 
 
 ### Evaluation

@@ -21,7 +21,10 @@ from l5pc.utils.evaluation_utils import (
     gt_log_prob,
     coverage,
     plot_coverage,
+    show_traces_pyloric,
 )
+from multiprocessing import Pool
+
 from l5pc.utils.model_utils import (
     replace_nan,
     add_observation_noise,
@@ -34,18 +37,66 @@ from l5pc.utils.common_utils import (
 from l5pc.model.utils import return_gt, return_x_names, return_names
 from l5pc.model import L5PC_20D_theta, L5PC_20D_x, summstats_l5pc
 from sbi.utils.support_posterior import PosteriorSupport
+from pyloric import create_prior, simulate, summary_stats
+from pyloric.utils import show_traces
 
 log = logging.getLogger(__name__)
 
 
 @hydra.main(config_path="config", config_name="evaluation")
 def evaluate(cfg: DictConfig) -> None:
+
+    if cfg.model.name.startswith("l5pc"):
+        l5pc_evaluation(cfg)
+    elif cfg.model.name.startswith("pyloric"):
+        pyloric_evaluation(cfg)
+    else:
+        raise ValueError
+
+
+def pyloric_evaluation(cfg):
+    _ = torch.manual_seed(cfg.seed)
+    inference, posterior, used_features, round_ = load_posterior(cfg.id, cfg.posterior)
+    log.info(f"Posterior after round: {round_}")
+    prior = create_prior()
+    lower = prior.numerical_prior.support.base_constraint.lower_bound
+    upper = prior.numerical_prior.support.base_constraint.upper_bound
+    prior_bounds = torch.stack([lower, upper]).T.numpy()
+    theta = prior.sample((cfg.num_predictives,))
+    num_splits = cfg.num_predictives
+    batches = np.array_split(theta, num_splits)
+    batches = [b.iloc[0] for b in batches]
+
+    with Pool(cfg.cores) as pool:
+        x_list = pool.map(simulate, batches)
+
+    stats = pd.concat([summary_stats(xx) for xx in x_list])
+    stats = stats.to_numpy()
+    valid = np.invert(np.any(np.isnan(stats), axis=1))
+    log.info(f"Fraction of valid sims: {np.sum(valid) / cfg.num_predictives}")
+    with mpl.rc_context(
+        fname="/mnt/qb/macke/mdeistler57/tsnpe_collection/l5pc/.matplotlibrc"
+    ):
+        show_traces_pyloric(x_list)
+        plt.savefig("traces.png")
+
+        posterior_samples = posterior.sample((1000,), show_progress_bars=False)
+        _ = pairplot(
+            posterior_samples,
+            limits=prior_bounds,
+            upper=["kde"],
+            ticks=prior_bounds,
+            figsize=(10, 10),
+        )
+        plt.savefig("pairplot.png")
+
+
+def l5pc_evaluation(cfg):
     _ = torch.manual_seed(cfg.seed)
     inference, posterior, used_features, round_ = load_posterior(cfg.id, cfg.posterior)
 
     # round_ = inference[0]._round + 1
     log.info(f"Posterior after round: {round_}")
-
     prior = load_prior()
     prior_bounds = extract_bounds(prior).T.numpy()
 
@@ -91,7 +142,7 @@ def evaluate(cfg: DictConfig) -> None:
         dtype=float32,
     ).T
 
-    x_pd = pd.DataFrame(x[-10000:].numpy(), columns=return_x_names())
+    x_pd = pd.DataFrame(x[-1000:].numpy(), columns=return_x_names())
 
     x = x[-1000:]
     theta = theta[-1000:]
@@ -122,10 +173,6 @@ def evaluate(cfg: DictConfig) -> None:
         post_lp, prior_lp = compare_gt_log_probs(posterior)
         log.info(f"Posterior log-prob: {post_lp}")
         log.info(f"Prior log-prob:     {prior_lp}")
-        _, acceptance_rate = posterior_support.sample(
-            (100,), return_acceptance_rate=True
-        )
-        log.info(f"log10(acceptance rate of support): {acceptance_rate}%")
 
         plot_coverage(alpha, cov)
         plt.savefig("coverage.png", dpi=200, bbox_inches="tight")
@@ -148,6 +195,11 @@ def evaluate(cfg: DictConfig) -> None:
         gt_log_prob(posterior)
         plt.savefig("log_probs.png", dpi=200, bbox_inches="tight")
         plt.show()
+
+        _, acceptance_rate = posterior_support.sample(
+            (100,), return_acceptance_rate=True
+        )
+        log.info(f"log10(acceptance rate of support): {acceptance_rate}%")
 
 
 if __name__ == "__main__":

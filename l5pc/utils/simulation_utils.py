@@ -17,6 +17,7 @@ from omegaconf import DictConfig
 import numpy as np
 import pandas as pd
 from l5pc.model.utils import return_names
+from pyloric import simulate, create_prior, summary_stats
 
 
 def simulate_and_summstats(
@@ -30,6 +31,8 @@ def simulate_and_summstats(
 def assemble_prior(cfg: DictConfig):
     if cfg.model.name.startswith("l5pc"):
         prior = Priorl5pc(bounds=cfg.model.prior, dim=cfg.model.num_params)
+    elif cfg.model.name.startswith("pyloric"):
+        prior = create_prior()
     else:
         raise NameError
     return prior
@@ -44,14 +47,20 @@ def assemble_simulator(cfg: DictConfig):
         )
         summstats = partial(summstats_l5pc, protocol_subset=cfg.protocols)
         setup_l5pc()
+        sim_and_stats = partial(
+            simulate_and_summstats,
+            _simulator=neuron_simulator,
+            _summstats=summstats,
+        )
+    elif cfg.name.startswith("pyloric"):
+        sim_and_stats = partial(
+            simulate_and_summstats,
+            _simulator=simulate,
+            _summstats=summary_stats,
+        )
     else:
         raise NameError
 
-    sim_and_stats = partial(
-        simulate_and_summstats,
-        _simulator=neuron_simulator,
-        _summstats=summstats,
-    )
     return sim_and_stats
 
 
@@ -60,12 +69,19 @@ def assemble_db(cfg: DictConfig):
         x_db = L5PC_20D_x()
         theta_db = L5PC_20D_theta()
     else:
-        raise NameError
+        x_db = None
+        theta_db = None
     return theta_db, x_db
 
 
 def write_to_dj(
-    theta: pd.DataFrame, x: pd.DataFrame, theta_db, x_db, round_: int, id_: str
+    theta: pd.DataFrame,
+    x: pd.DataFrame,
+    theta_db,
+    x_db,
+    round_: int,
+    id_: str,
+    increase_by_1000: bool = False,
 ) -> None:
     """
     Writes theta and x to the database server.
@@ -82,6 +98,8 @@ def write_to_dj(
         theta_starting_ind = np.max(previous_indizes) + 1
     else:
         theta_starting_ind = 0
+    if increase_by_1000:
+        theta_starting_ind += 1000
 
     x["ind"] = x.index
     x["ind"] += theta_starting_ind

@@ -42,3 +42,158 @@ R7:
 
 R8:
 - 2022_04_25__07_21_21_snpe
+
+
+
+
+
+
+
+
+
+Run 2 (l20_2):
+R1:
+- 30k sims
+- 35 features
+- ensemble of 10
+- path: previous_inference=2022_04_27__19_06_37_snpe
+- evaluation run: 2022_04_27__23_41_19__2022_04_27__19_06_37_snpe
+
+
+R2: 
+- disregard the samples from the first round and train from scratch
+- 30k sims
+- 35 features
+- ensemble of 10
+- path: 2022_04_28__08_15_09_snpe
+- evaluation run: 2022_04_28__10_57_24__multirun
+
+R3:
+- uses samples from second round (but not first) and does not train from scratch
+- 30k sims
+- 35 features
+- ensemble of 10
+- path: 2022_04_28__22_30_29_snpe_m/0
+- evaluation run: 2022_04_29__08_16_57__multirun/0__2022_04_28__22_30_29_snpe_m/0
+
+R4:
+- started
+- 30k sims
+- 35 features
+- ensemble of 10
+- path: 2022_04_29__17_11_50_snpe_m
+
+
+
+
+
+
+
+
+Run 3 (l20_3): SNPE-C with Flow trained in constrained space
+R1:
+- 30k sims
+- 35 features
+- ensemble of 10
+- path: previous_inference=2022_04_27__19_06_37_snpe
+- evaluation run: 2022_04_27__23_41_19__2022_04_27__19_06_37_snpe
+
+R2:
+Failed with only R2 data and train from scratch:
+- 2022_04_29__08_52_03_snpe_m
+
+R2:
+Succeeded when using data from both rounds and continuing training from R1:
+- ensemble size=1
+- poor coverage
+- 84% good simulations
+- path: 2022_04_29__10_02_26_snpe
+- evaluation path: 2022_04_29__11_01_35__multirun/0__2022_04_29__10_02_26_snpe
+
+
+
+
+
+
+
+
+
+
+Run 4 (l20_4): SNPE-C with flow in unconstrained space and maf density estimator
+R1:
+- 30k sims
+- 35 features
+- ensemble of 1
+- path: 2022_04_29__14_05_07_snpe
+- evaluation path: 2022_04_29__14_34_57__multirun/0__2022_04_29__14_05_07_snpe
+- 5% good simulations
+- posterior log-prob 21.008
+
+R2:
+- performed on simultions from l20_3
+- 30k sims
+- 35 features
+- ensemble of 1
+- path: 2022_04_29__15_04_42_snpe_m/0
+- evaluation path: 2022_04_29__16_16_33__multirun/0__2022_04_29__15_04_42_snpe_m/0
+- could not sample. Out of 10 million, 0 samples were in the support
+
+
+
+
+
+
+
+
+
+Run 5 (l20_5): SNPE-C with flow in unconstrained space and nsf density estimator
+R1:
+- 30k sims
+- 35 features
+- ensemble of 1
+- path: 2022_04_29__14_15_25_snpe_m/0
+- evaluation path: 2022_04_29__14_52_37__multirun/0__2022_04_29__14_15_25_snpe_m
+- 9% good simulations
+- posterior log-prob 27.699
+
+R2:
+- performed on simultions from l20_3
+- 30k sims
+- 35 features
+- ensemble of 1
+- path: 2022_04_29__15_04_28_snpe_m/0
+- evaluation path: Out of 10 million, 0 samples were in the support
+
+
+
+
+
+
+
+
+
+
+Run 6 (l20_6): SNPE-C with flow in constrained space and MAF
+R1:
+- 30k sims
+- 35 features
+- ensemble of 1
+- path: 2022_04_29__16_56_21_snpe
+- evaluation path: never been evaluated
+
+R2:
+
+
+
+
+
+=================================================================================
+Pyloric
+
+P31_1:
+pyloric net with nsf, forced to constrained space (i.e. ideal setup)
+R1:
+- 30k sims
+- path: 2022_04_29__16_13_22_snpe
+- evaluation: 2022_04_29__16_19_28__2022_04_29__16_13_22_snpe
+

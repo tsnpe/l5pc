@@ -1,7 +1,7 @@
 from multiprocessing import Pool
 from os.path import join
 from copy import deepcopy
-from tqdm import tqdm
+from tqdm.auto import tqdm
 from torch import tensor, as_tensor, Tensor, eye, zeros, ones, float32
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -240,11 +240,13 @@ def coverage(
     gt_is_covered /= x.shape[0]
     return alpha, torch.flip(gt_is_covered, dims=[0])
 
+
 def compute_rank(val: Tensor, vec: Tensor):
     c = torch.cat([vec, val])
     s = torch.argsort(c)
     ind = torch.where(s == len(c) - 1)
     return ind[0]  # .where returns a tuple
+
 
 def plot_coverage(alpha, gt_is_covered):
     fig, ax = plt.subplots(1, 1, figsize=(1.5, 1.5))
@@ -256,3 +258,28 @@ def plot_coverage(alpha, gt_is_covered):
     ax.set_ylim([0, 1])
     ax.set_xlabel("Confidence level")
     ax.set_ylabel("Empirical coverage")
+
+
+def show_traces_pyloric(simulation_output):
+    fig, axes = plt.subplots(10, 3, figsize=(6, 10))
+    for trace_ind in range(10):
+        current_sim = simulation_output[trace_ind]
+        traces = current_sim["voltage"]
+        t = np.arange(0, current_sim["t_max"], current_sim["dt"])
+        global_min = np.min(traces)
+        global_max = np.max(traces)
+        neuron_labels = ["AB/PD", "LP", "PY"]
+        current_ax = axes[trace_ind]
+        for i, ax in enumerate(current_ax):
+            ax.plot(t, traces[i])
+            ax.set_ylim([global_min, global_max])
+            if i < 2:
+                ax.set_xticks([])
+            else:
+                ax.set_xlabel("Time (ms)")
+            ax.spines["top"].set_visible(False)
+            ax.spines["right"].set_visible(False)
+            ax.set_ylabel(neuron_labels[i])
+            if i == 0:
+                ax.set_title("Votage (mV)")
+    return fig, axes
