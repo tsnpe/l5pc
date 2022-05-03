@@ -55,6 +55,14 @@
 	@printf " -> $(C_GREEN)Compiling$(C_RESET) $<\\n"
 	$(COMPILE) -I"../mechanisms" $(INCLUDES) -fPIC -c $< -o $@
 
+./Nap_Et2.c: ../mechanisms/Nap_Et2.mod
+	@printf " -> $(C_GREEN)NMODL$(C_RESET) $<\\n"
+	(cd "../mechanisms"; MODLUNIT=$(NRNUNITS) $(NOCMODL) Nap_Et2.mod -o "/mnt/qb/macke/mdeistler57/tsnpe_collection/l5pc/l5pc/model/x86_64")
+
+./Nap_Et2.o: ./Nap_Et2.c
+	@printf " -> $(C_GREEN)Compiling$(C_RESET) $<\\n"
+	$(COMPILE) -I"../mechanisms" $(INCLUDES) -fPIC -c $< -o $@
+
 ./NaTa_t.c: ../mechanisms/NaTa_t.mod
 	@printf " -> $(C_GREEN)NMODL$(C_RESET) $<\\n"
 	(cd "../mechanisms"; MODLUNIT=$(NRNUNITS) $(NOCMODL) NaTa_t.mod -o "/mnt/qb/macke/mdeistler57/tsnpe_collection/l5pc/l5pc/model/x86_64")
@@ -68,14 +76,6 @@
 	(cd "../mechanisms"; MODLUNIT=$(NRNUNITS) $(NOCMODL) NaTs2_t.mod -o "/mnt/qb/macke/mdeistler57/tsnpe_collection/l5pc/l5pc/model/x86_64")
 
 ./NaTs2_t.o: ./NaTs2_t.c
-	@printf " -> $(C_GREEN)Compiling$(C_RESET) $<\\n"
-	$(COMPILE) -I"../mechanisms" $(INCLUDES) -fPIC -c $< -o $@
-
-./Nap_Et2.c: ../mechanisms/Nap_Et2.mod
-	@printf " -> $(C_GREEN)NMODL$(C_RESET) $<\\n"
-	(cd "../mechanisms"; MODLUNIT=$(NRNUNITS) $(NOCMODL) Nap_Et2.mod -o "/mnt/qb/macke/mdeistler57/tsnpe_collection/l5pc/l5pc/model/x86_64")
-
-./Nap_Et2.o: ./Nap_Et2.c
 	@printf " -> $(C_GREEN)Compiling$(C_RESET) $<\\n"
 	$(COMPILE) -I"../mechanisms" $(INCLUDES) -fPIC -c $< -o $@
 

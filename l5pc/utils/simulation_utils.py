@@ -64,6 +64,16 @@ def assemble_simulator(cfg: DictConfig):
     return sim_and_stats
 
 
+def sim_and_stat_pyloric(theta: pd.DataFrame) -> pd.DataFrame:
+    trace = simulate(theta)
+    x = summary_stats(trace, stats_customization={"plateau_durations": True})
+    return x
+
+
+def assemble_pyloric():
+    return sim_and_stat_pyloric
+
+
 def assemble_db(cfg: DictConfig):
     if cfg.model.name.startswith("l5pc"):
         x_db = L5PC_20D_x()

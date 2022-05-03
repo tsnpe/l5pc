@@ -81,11 +81,15 @@ R4:
 - 30k sims
 - 35 features
 - ensemble of 10
-- path: 2022_04_29__17_11_50_snpe_m
+- path: 2022_04_29__17_11_50_snpe_m or 2022_04_30__22_00_21_snpe_m/0
 
+R5:
+- path: 2022_05_01__12_02_16_snpe_m
+- evaluation: 2022_05_01__17_19_46__multirun
 
-
-
+R6:
+- path: 2022_05_02__19_31_58_snpe_m
+- evaluation: 
 
 
 
@@ -178,22 +182,34 @@ R1:
 - 30k sims
 - 35 features
 - ensemble of 1
-- path: 2022_04_29__16_56_21_snpe
-- evaluation path: never been evaluated
+- path: 2022_05_01__15_02_01_snpe
+- evaluation path: 2022_05_01__15_35_35__multirun
+
 
 R2:
-
-
+- path: 2022_05_01__15_17_31_snpe
+- evaluation: 2022_05_01__15_55_05__multirun
 
 
 
 =================================================================================
 Pyloric
 
-P31_1:
-pyloric net with nsf, forced to constrained space (i.e. ideal setup)
+P31_1: pyloric net with nsf, forced to constrained space (i.e. ideal setup)
+
 R1:
-- 30k sims
-- path: 2022_04_29__16_13_22_snpe
-- evaluation: 2022_04_29__16_19_28__2022_04_29__16_13_22_snpe
+- 100k sims
+- path: 2022_04_30__22_51_26_snpe_m/0
+- evaluation: 2022_05_01__15_29_55__2022_04_30__22_51_26_snpe_m
+- ensemble of 10
+
+R2: 
+- 50k sims
+- path: 2022_05_01__15_15_50_snpe_m/0
+- ensemble of 1
+
+p31_2: pyloric net with maf, forced to constrained space
+
+R1: 
+path: 2022_05_01__17_13_52_snpe_m
 

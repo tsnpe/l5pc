@@ -85,7 +85,12 @@ def sample_and_simulate(cfg: DictConfig) -> None:
 
         log.debug(f"Sampled proposal", theta.shape)
         if isinstance(theta, torch.Tensor):
-            theta = pd.DataFrame(theta.numpy(), columns=return_names())
+            if cfg.model.name.startswith("l5pc"):
+                theta = pd.DataFrame(theta.numpy(), columns=return_names())
+            else:
+                sss = prior.sample((1,))
+                pyloric_names = sss.columns
+                theta = pd.DataFrame(theta.numpy(), columns=pyloric_names)
 
         if cfg.model.name.startswith("l5pc"):
             gt = return_gt()

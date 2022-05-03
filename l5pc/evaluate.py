@@ -38,7 +38,6 @@ from l5pc.model.utils import return_gt, return_x_names, return_names
 from l5pc.model import L5PC_20D_theta, L5PC_20D_x, summstats_l5pc
 from sbi.utils.support_posterior import PosteriorSupport
 from pyloric import create_prior, simulate, summary_stats
-from pyloric.utils import show_traces
 
 log = logging.getLogger(__name__)
 
@@ -62,7 +61,9 @@ def pyloric_evaluation(cfg):
     lower = prior.numerical_prior.support.base_constraint.lower_bound
     upper = prior.numerical_prior.support.base_constraint.upper_bound
     prior_bounds = torch.stack([lower, upper]).T.numpy()
-    theta = prior.sample((cfg.num_predictives,))
+    theta = posterior.sample((cfg.num_predictives,))
+    prior_samples = prior.sample((1,))
+    theta = pd.DataFrame(theta.numpy(), columns=prior_samples.columns)
     num_splits = cfg.num_predictives
     batches = np.array_split(theta, num_splits)
     batches = [b.iloc[0] for b in batches]

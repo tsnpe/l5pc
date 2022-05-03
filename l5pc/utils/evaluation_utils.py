@@ -261,25 +261,24 @@ def plot_coverage(alpha, gt_is_covered):
 
 
 def show_traces_pyloric(simulation_output):
-    fig, axes = plt.subplots(10, 3, figsize=(6, 10))
+    fig, axes = plt.subplots(10, 3, figsize=(7.5, 5.5))
     for trace_ind in range(10):
         current_sim = simulation_output[trace_ind]
         traces = current_sim["voltage"]
         t = np.arange(0, current_sim["t_max"], current_sim["dt"])
-        global_min = np.min(traces)
-        global_max = np.max(traces)
         neuron_labels = ["AB/PD", "LP", "PY"]
         current_ax = axes[trace_ind]
         for i, ax in enumerate(current_ax):
             ax.plot(t, traces[i])
-            ax.set_ylim([global_min, global_max])
-            if i < 2:
+            ax.set_ylim([-90, 60])
+            if i < 2 or trace_ind < 9:
                 ax.set_xticks([])
+                ax.set_yticks([])
             else:
                 ax.set_xlabel("Time (ms)")
             ax.spines["top"].set_visible(False)
             ax.spines["right"].set_visible(False)
             ax.set_ylabel(neuron_labels[i])
-            if i == 0:
+            if i == 0 and trace_ind == 0:
                 ax.set_title("Votage (mV)")
     return fig, axes

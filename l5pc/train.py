@@ -32,7 +32,6 @@ def train(cfg: DictConfig) -> None:
 
     base_path = "/mnt/qb/macke/mdeistler57/tsnpe_collection/l5pc"
     inference_path = join(base_path, f"results/{cfg.id}/inference")
-    sim_path = join(base_path, f"results/{cfg.id}/simulations")
 
     if cfg.previous_inference is None:
         previous_feature_list = []
@@ -84,6 +83,8 @@ def train(cfg: DictConfig) -> None:
             dtype=float32,
         ).T
     elif cfg.model.name.startswith("pyloric"):
+        data_id = cfg.id if round_ > 1 else "p31_0"
+        sim_path = join(base_path, f"results/{data_id}/simulations")
         theta = pd.read_pickle(join(sim_path, join(cfg.data_path, "sims_theta.pkl")))
         x = pd.read_pickle(join(sim_path, join(cfg.data_path, "sims_x.pkl")))
         theta = as_tensor(np.asarray(theta), dtype=float32)
@@ -131,7 +132,7 @@ def train(cfg: DictConfig) -> None:
 
     # x_only_good_features = x[:, features_to_keep]
     # is_valid_x, _, _ = handle_invalid_x(x_only_good_features, True)
-    if cfg.replace_nan_values or cfg.train_on_all:
+    if cfg.replace_nan_values:
         x, replacement_values = replace_nan(x)
         x = add_observation_noise(
             x=x,
