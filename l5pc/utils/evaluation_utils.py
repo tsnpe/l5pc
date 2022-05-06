@@ -187,6 +187,7 @@ def predictive_traces(
     batches = np.array_split(samples_pd, num_splits)
 
     setup_l5pc()
+    np.savetxt("test_file.txt", [0, 1])
     with Pool(num_cores) as pool:
         x_list = pool.map(simulate_l5pc, batches)
 

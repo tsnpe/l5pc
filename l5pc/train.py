@@ -166,30 +166,44 @@ def train(cfg: DictConfig) -> None:
     log.info(f"theta dim to train: {theta.shape}")
     log.info(f"x dim to train: {x.shape}")
 
-    # inferences = Parallel(n_jobs=cfg.ensemble_size)(
-    #     delayed(train_given_seed)(
-    #         cfg, method, previous_inferences[seed], prior, dens_estim, theta, x, seed
-    #     )
-    #     for seed in range(cfg.ensemble_size)
-    # )
-    inferences = []
-    for seed in range(cfg.ensemble_size):
-        _ = torch.manual_seed(cfg.seed_train + seed)
-        if cfg.load_nn_from_prev_inference:
-            inference = previous_inferences[seed]
-        else:
-            inference = method(prior=prior, density_estimator=dens_estim)
-
-        _ = inference.append_simulations(theta, x, proposal=train_proposal).train(
-            max_num_epochs=cfg.max_num_epochs,
-            training_batch_size=cfg.training_batch_size,
-            stop_after_epochs=cfg.stop_after_epochs,
-            force_first_round_loss=True,
+    if cfg.parallel_training:
+        log.info("parallel training")
+        inferences = Parallel(n_jobs=cfg.ensemble_size)(
+            delayed(train_given_seed)(
+                cfg,
+                method,
+                previous_inferences[seed],
+                prior,
+                dens_estim,
+                theta,
+                x,
+                seed,
+                train_proposal,
+            )
+            for seed in range(cfg.ensemble_size)
         )
-        if cfg.previous_inference is not None and not cfg.load_nn_from_prev_inference:
-            inference.trained_rounds = round_
-        inferences.append(inference)
-        log.info(f"_best_val_log_prob {inference._best_val_log_prob}")
+    else:
+        inferences = []
+        for seed in range(cfg.ensemble_size):
+            _ = torch.manual_seed(cfg.seed_train + seed)
+            if cfg.load_nn_from_prev_inference:
+                inference = previous_inferences[seed]
+            else:
+                inference = method(prior=prior, density_estimator=dens_estim)
+
+            _ = inference.append_simulations(theta, x, proposal=train_proposal).train(
+                max_num_epochs=cfg.max_num_epochs,
+                training_batch_size=cfg.training_batch_size,
+                stop_after_epochs=cfg.stop_after_epochs,
+                force_first_round_loss=True,
+            )
+            # if (
+            #     cfg.previous_inference is not None
+            #     and not cfg.load_nn_from_prev_inference
+            # ):
+            #     inference.trained_rounds = round_
+            inferences.append(inference)
+            log.info(f"_best_val_log_prob {inference._best_val_log_prob}")
 
     if cfg.model.name.startswith("l5pc"):
         xo_all = return_xo(as_pd=False)[0]
@@ -244,7 +258,15 @@ def train(cfg: DictConfig) -> None:
 
 
 def train_given_seed(
-    cfg, method, previous_inferences_specific, prior, dens_estim, theta, x, seed
+    cfg,
+    method,
+    previous_inferences_specific,
+    prior,
+    dens_estim,
+    theta,
+    x,
+    seed,
+    train_proposal,
 ):
     _ = torch.manual_seed(cfg.seed_train + seed)
     if cfg.load_nn_from_prev_inference:
@@ -252,7 +274,7 @@ def train_given_seed(
     else:
         inference = method(prior=prior, density_estimator=dens_estim)
 
-    _ = inference.append_simulations(theta, x).train(
+    _ = inference.append_simulations(theta, x, proposal=train_proposal).train(
         max_num_epochs=cfg.max_num_epochs,
         training_batch_size=cfg.training_batch_size,
         stop_after_epochs=cfg.stop_after_epochs,

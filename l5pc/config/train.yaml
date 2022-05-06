@@ -22,6 +22,7 @@ replace_nan_values: True
 temper_xo: False
 data_path: null
 simulation_loaded_from_id: null
+parallel_training: True
 
 hydra:
   run:

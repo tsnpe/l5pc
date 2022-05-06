@@ -192,6 +192,39 @@ R2:
 
 
 
+
+
+
+
+
+
+
+Run 7 (l20_7):
+R1:
+path: 2022_04_27__19_06_37_snpe
+evaluation: 2022_05_04__17_39_38__multirun
+
+R2:
+path: 2022_05_05__07_47_34_snpe_m/0
+evaluation: 2022_05_05__11_00_41__2022_05_05__07_47_34_snpe_m
+
+R3:
+path: 2022_05_05__21_28_21_snpe
+evaluation: 2022_05_05__23_42_37__multirun
+
+R4:
+path: 2022_05_06__13_50_43_snpe
+evaluation: 2022_05_06__14_50_41__multirun
+
+R5:
+path: 
+evaluation: 
+
+
+
+
+
+
 =================================================================================
 Pyloric
 
@@ -213,3 +246,12 @@ p31_2: pyloric net with maf, forced to constrained space
 R1: 
 path: 2022_05_01__17_13_52_snpe_m
 
+p31_2:
+R01-10: 2022_05_04__15_52_51__multirun
+R11-20: 2022_05_04__23_08_47__multirun
+R21-30: 2022_05_05__12_38_36__multirun
+
+
+2022_05_06__13_08_05__multirun are the three NPE runs
+
+2022_05_06__16_08_24__multirun TSNPE round 1-5

@@ -17,10 +17,17 @@ num_rounds: 1
 max_num_epochs: 10000
 training_batch_size: 500
 stop_after_epochs: 20
-num_initial: 100000
+num_initial: 300000
 density_estimator: "nsf"
 ensemble_size: 1
 replace_nan_values: False
+parallel_training: False
+thr_proposal: True
+atomic_loss: False
+start_round: 1
+path_to_prev_inference: null
+retrain_first_round: True
+sigmoid_theta: True
 
 hydra:
   run:

@@ -48,8 +48,10 @@ def multiround(cfg: DictConfig) -> None:
     print(cfg)
     assert cfg.id is not None, "Specify an ID. Format: [model][dim]_[run], e.g. j2_3"
 
-    for r in range(1, cfg.num_rounds + 1):
-        simulate_mp(cfg, r)
+    for r in range(cfg.start_round, cfg.num_rounds + cfg.start_round):
+        log.info(f"============= Starting round {r} =============")
+        if r > 1:
+            simulate_mp(cfg, r)
         train(cfg, r)
         evaluate(cfg, r)
 
@@ -59,7 +61,7 @@ def simulate_mp(cfg, round_):
     prior = load_classifier_prior()
     sim_and_stats = assemble_pyloric()
 
-    log.debug(f"Assembled! {time.time() - start_time}")
+    log.info(f"Assembled! {time.time() - start_time}")
 
     seed = (
         int((time.time() % 1) * 1e7)
@@ -69,13 +71,21 @@ def simulate_mp(cfg, round_):
     _ = torch.manual_seed(seed)
     np.savetxt(f"seed.txt", [seed], fmt="%d")
 
-    log.debug(f"Starting loop! {time.time() - start_time}")
+    log.info(f"Starting loop! {time.time() - start_time}")
 
+    log.info(f"Round {round_} in simulate_mp")
     if round_ == 1:
+        log.info(f"Using prior as proposal")
         proposal = prior
     else:
-        posterior, _ = load_pyloric_posterior(f"posterior_r{round_-1}")
-        log.debug(f"Loaded posterior, round", round_)
+        log.info(f"Loading posterior")
+        if cfg.path_to_prev_inference is None or round_ > cfg.start_round:
+            posterior, _ = load_pyloric_posterior(round_ - 1)
+        else:
+            posterior, _ = load_pyloric_posterior_from_file(
+                cfg.path_to_prev_inference, round_ - 1
+            )
+        log.info(f"Loaded posterior")
         if cfg.thr_proposal:
             _ = torch.manual_seed(0)  # Set seed=0 only for building the proposal.
             proposal = PosteriorSupport(
@@ -86,44 +96,59 @@ def simulate_mp(cfg, round_):
                 use_constrained_prior=cfg.use_constrained_prior,
                 constrained_prior_quanitle=cfg.constrained_prior_quanitle,
             )
-            log.debug("Built support")
+            _, acceptance_rate = proposal.sample((10,), return_acceptance_rate=True)
+            log.info(f"Acceptance rate of support proposal: {acceptance_rate}")
+            log.info("Built support")
             _ = torch.manual_seed(seed)
         else:
+            log.info("Setting posterior as proposal")
             proposal = posterior
 
-    for counter in range(40):
-        log.debug(f"num_to_simulate", cfg.sims_per_round)
-        theta = proposal.sample((cfg.sims_per_round,))
+    log.info(f"num_to_simulate", cfg.sims_per_round)
+    theta = proposal.sample((cfg.sims_per_round,))
 
-        log.debug(f"Sampled proposal", theta.shape)
-        if isinstance(theta, torch.Tensor):
-            prior_pd = create_prior()
-            sss = prior_pd.sample((1,))
-            pyloric_names = sss.columns
-            theta = pd.DataFrame(theta.numpy(), columns=pyloric_names)
+    log.info(f"prior of proposal: {proposal._prior}")
 
-        theta_full = theta
+    restricted_prior = load_classifier_prior(wrap=False)
+    num_accepted = restricted_prior.predict(theta)
+    log.info(
+        f"Fraction of accepted posterior samples: {torch.sum(num_accepted) / theta.shape[0]}"
+    )
 
-        log.debug(f"Time to obtain theta: {time.time() - start_time}")
+    log.info(f"Sampled proposal", theta.shape)
+    if isinstance(theta, torch.Tensor):
+        prior_pd = create_prior()
+        sss = prior_pd.sample((1,))
+        pyloric_names = sss.columns
+        theta = pd.DataFrame(theta.numpy(), columns=pyloric_names)
 
-        # Each worker should process a batch of simulations to reduce the overhead of
-        # loading neuron.
-        num_splits = cfg.sims_per_round
-        batches = np.array_split(theta_full, num_splits)
-        batches = [b.iloc[0] for b in batches]
+    theta_full = theta
 
-        log.debug(f"Time to obtain batches: {time.time() - start_time}")
+    log.info(f"Time to obtain theta: {time.time() - start_time}")
 
-        with Pool(cfg.cores) as pool:
-            x_list = pool.map(sim_and_stats, batches)
+    # Each worker should process a batch of simulations to reduce the overhead of
+    # loading neuron.
+    num_splits = cfg.sims_per_round
+    batches = np.array_split(theta_full, num_splits)
+    batches = [b.iloc[0] for b in batches]
 
-        log.debug(f"Sims done {time.time() - start_time}")
-        x = pd.concat(x_list, ignore_index=True)
-        log.debug(f"Sims concatenated {time.time() - start_time}")
+    log.info(f"Time to obtain batches: {time.time() - start_time}")
 
-        log.info(f"Saving {len(x)} simulations")
-        theta_full.to_pickle(f"sims_theta_r{round_}_{counter}.pkl")
-        x.to_pickle(f"sims_x_r{round_}_{counter}.pkl")
+    with Pool(cfg.cores) as pool:
+        x_list = pool.map(sim_and_stats, batches)
+
+    log.info(f"Sims done {time.time() - start_time}")
+    x = pd.concat(x_list, ignore_index=True)
+
+    stats = x.to_numpy()
+    valid = np.invert(np.any(np.isnan(stats), axis=1))
+    log.info(f"Fraction of valid sims in simulate: {np.sum(valid) / len(stats)}")
+
+    log.info(f"Sims concatenated {time.time() - start_time}")
+
+    log.info(f"Saving {len(x)} simulations")
+    theta_full.to_pickle(f"sims_theta_r{round_}.pkl")
+    x.to_pickle(f"sims_x_r{round_}.pkl")
 
 
 def train(cfg, round_):
@@ -132,8 +157,15 @@ def train(cfg, round_):
         previous_inferences = [None] * cfg.ensemble_size
         train_proposal = None
     else:
-        prev_posterior, previous_inferences = load_pyloric_posterior(round_ - 1)
-        if cfg.algorithm.atomic_loss:
+        if cfg.path_to_prev_inference is None or round_ > cfg.start_round:
+            log.info("Load posterior from current directory")
+            prev_posterior, previous_inferences = load_pyloric_posterior(round_ - 1)
+        else:
+            log.info("Load posterior from a different directory")
+            prev_posterior, previous_inferences = load_pyloric_posterior_from_file(
+                cfg.path_to_prev_inference, round_ - 1
+            )
+        if cfg.atomic_loss:
             # This is just a dummy. The proposal is never evaluated in APT anyways.
             train_proposal = prev_posterior.posteriors[0]
         else:
@@ -141,10 +173,17 @@ def train(cfg, round_):
         # round_ = previous_inferences[0]._round + 1 + 1
     log.info(f"Round: {round_}")
 
-    theta = pd.read_pickle(f"sims_theta_r{round_}.pkl")
-    x = pd.read_pickle(f"sims_x_r{round_}.pkl")
+    if round_ == 1:
+        path = "/mnt/qb/macke/mdeistler57/tsnpe_collection/l5pc/results/p31_2/prior_predictives_energy_paper"
+        theta = pd.read_pickle(join(path, "all_circuit_parameters.pkl"))
+        x = pd.read_pickle(join(path, "all_simulation_outputs.pkl"))
+        log.info(f"Pre-loaded {len(x)} simulations from file.")
+    else:
+        theta = pd.read_pickle(f"sims_theta_r{round_}.pkl")
+        x = pd.read_pickle(f"sims_x_r{round_}.pkl")
     theta = as_tensor(np.asarray(theta), dtype=float32)
     x = as_tensor(np.asarray(x), dtype=float32)
+    x = x[:, :18]
 
     theta = theta[: cfg.num_initial]
     x = x[: cfg.num_initial]
@@ -160,34 +199,55 @@ def train(cfg, round_):
     log.info(f"theta dim to train: {theta.shape}")
     log.info(f"x dim to train: {x.shape}")
 
+    prior_for_bounds = create_prior().numerical_prior
     dens_estim = posterior_nn(
         cfg.density_estimator,
-        sigmoid_theta=False,
-        prior=None,
+        sigmoid_theta=cfg.sigmoid_theta,
+        prior=prior_for_bounds,
     )
 
-    # inferences = Parallel(n_jobs=cfg.ensemble_size)(
-    #     delayed(train_given_seed)(
-    #         cfg, method, previous_inferences[seed], prior, dens_estim, theta, x, seed
-    #     )
-    #     for seed in range(cfg.ensemble_size)
-    # )
-    inferences = []
-    for seed in range(cfg.ensemble_size):
-        _ = torch.manual_seed(cfg.seed_train + seed)
-        if round_ > 1:
-            inference = previous_inferences[seed]
+    if round_ > 1 or cfg.retrain_first_round:
+        if cfg.parallel_training:
+            inferences = Parallel(n_jobs=cfg.ensemble_size)(
+                delayed(train_given_seed)(
+                    cfg,
+                    previous_inferences[seed],
+                    prior,
+                    dens_estim,
+                    theta,
+                    x,
+                    seed,
+                    train_proposal,
+                    round_,
+                )
+                for seed in range(cfg.ensemble_size)
+            )
         else:
-            inference = SNPE(prior=prior, density_estimator=dens_estim)
+            inferences = []
+            for seed in range(cfg.ensemble_size):
+                _ = torch.manual_seed(cfg.seed_train + seed)
+                if round_ > 1:
+                    inference = previous_inferences[seed]
+                else:
+                    log.info(f"Initializiating SNPE with prior {prior}")
+                    inference = SNPE(prior=prior, density_estimator=dens_estim)
 
-        _ = inference.append_simulations(theta, x, proposal=train_proposal).train(
-            max_num_epochs=cfg.max_num_epochs,
-            training_batch_size=cfg.training_batch_size,
-            stop_after_epochs=cfg.stop_after_epochs,
-            force_first_round_loss=True,
-        )
-        inferences.append(inference)
-        log.info(f"_best_val_log_prob {inference._best_val_log_prob}")
+                _ = inference.append_simulations(
+                    theta, x, proposal=train_proposal
+                ).train(
+                    max_num_epochs=cfg.max_num_epochs,
+                    training_batch_size=cfg.training_batch_size,
+                    stop_after_epochs=cfg.stop_after_epochs,
+                    force_first_round_loss=True,
+                )
+                inferences.append(inference)
+                log.info(f"_best_val_log_prob {inference._best_val_log_prob}")
+    else:
+        log.info("Loading first round inference from file.")
+        pa = "/mnt/qb/macke/mdeistler57/tsnpe_collection/l5pc/results/p31_2/multiround"
+        with open(join(pa, "2022_05_04__08_18_59/inference_r1.pkl"), "rb") as handle:
+            inferences = pickle.load(handle)
+        inferences = inferences[: cfg.ensemble_size]
 
     with open(f"inference_r{round_}.pkl", "wb") as handle:
         dill.dump(inferences, handle)
@@ -209,12 +269,17 @@ def evaluate(cfg, round_):
     upper = prior.numerical_prior.support.base_constraint.upper_bound
     prior_bounds = torch.stack([lower, upper]).T.numpy()
 
-    theta = posterior.sample((cfg.num_predictives,))
+    theta_torch = posterior.sample((cfg.num_predictives,))
     prior_samples = prior.sample((1,))
-    theta = pd.DataFrame(theta.numpy(), columns=prior_samples.columns)
+    theta = pd.DataFrame(theta_torch.numpy(), columns=prior_samples.columns)
     num_splits = cfg.num_predictives
     batches = np.array_split(theta, num_splits)
     batches = [b.iloc[0] for b in batches]
+
+    theta_torch = posterior.sample((10000,))
+    restricted_prior = load_classifier_prior(wrap=False)
+    num_accepted = restricted_prior.predict(theta_torch)
+    log.info(f"Number of accepted posterior samples: {torch.sum(num_accepted)}")
 
     with Pool(cfg.cores) as pool:
         x_list = pool.map(simulate, batches)
@@ -227,7 +292,7 @@ def evaluate(cfg, round_):
         fname="/mnt/qb/macke/mdeistler57/tsnpe_collection/l5pc/.matplotlibrc"
     ):
         show_traces_pyloric(x_list)
-        plt.savefig("traces.png")
+        plt.savefig(f"traces_r{round_}.png")
 
         posterior_samples = posterior.sample((1000,), show_progress_bars=False)
         _ = pairplot(
@@ -237,29 +302,63 @@ def evaluate(cfg, round_):
             ticks=prior_bounds,
             figsize=(10, 10),
         )
-        plt.savefig("pairplot.png")
+        plt.savefig(f"pairplot_r{round_}.png")
+
+    # if round_ == 1:
+    #     path = "/mnt/qb/macke/mdeistler57/tsnpe_collection/l5pc/results/p31_2/prior_predictives_energy_paper"
+    #     theta = pd.read_pickle(join(path, "all_circuit_parameters.pkl"))
+    #     x = pd.read_pickle(join(path, "all_simulation_outputs.pkl"))
+    #     log.info(f"Evaluation: Pre-loaded {len(x)} simulations from file.")
+    # else:
+    #     theta = pd.read_pickle(f"sims_theta_r{round_}.pkl")
+    #     x = pd.read_pickle(f"sims_x_r{round_}.pkl")
+    # theta = as_tensor(np.asarray(theta), dtype=float32)
+    # x = as_tensor(np.asarray(x), dtype=float32)
+    # x = x[:, :18]
+
+    # alpha, cov = coverage(posterior, theta, x, used_features)
 
 
-def load_classifier_prior():
+def train_given_seed(
+    cfg,
+    previous_inferences_specific,
+    prior,
+    dens_estim,
+    theta,
+    x,
+    seed,
+    train_proposal,
+    round_,
+):
+    _ = torch.manual_seed(cfg.seed_train + seed)
+    if round_ > 1:
+        inference = previous_inferences_specific
+    else:
+        inference = SNPE(prior=prior, density_estimator=dens_estim)
+
+    x_np = x.numpy()
+    valid = np.invert(np.any(np.isnan(x_np), axis=1))
+    log.info(f"Fraction of valid sims in train_given_seed: {np.sum(valid) / len(x)}")
+
+    _ = inference.append_simulations(theta, x, proposal=train_proposal).train(
+        max_num_epochs=cfg.max_num_epochs,
+        training_batch_size=cfg.training_batch_size,
+        stop_after_epochs=cfg.stop_after_epochs,
+        force_first_round_loss=True,
+    )
+    log.info(f"_best_val_log_prob {inference._best_val_log_prob}")
+    return inference
+
+
+def load_classifier_prior(wrap: bool = True):
     with open(
         "/mnt/qb/macke/mdeistler57/tsnpe_collection/l5pc/results/pyloric_restricted_prior.pkl",
         "rb",
     ) as handle:
         classifier = pickle.load(handle)
-    wrapped_classifier, _, _ = process_prior(classifier)
-    return wrapped_classifier
-
-
-# class WrapperPrior(torch.distributions.Distribution):
-#     def __init__(self, prior):
-#         super().__init__()
-#         self.prior = prior
-
-#     def sample(self, num_samples):
-#         return self.prior.sample(num_samples)
-
-#     def log_prob(self, theta):
-#         return self.prior.log_prob(theta)
+    if wrap:
+        classifier, _, _ = process_prior(classifier)
+    return classifier
 
 
 def load_pyloric_posterior(round_):
@@ -294,23 +393,38 @@ def load_pyloric_posterior(round_):
     return ensemble_post, inferences
 
 
-def train_given_seed(
-    cfg, method, previous_inferences_specific, prior, dens_estim, theta, x, seed
-):
-    _ = torch.manual_seed(cfg.seed_train + seed)
-    if cfg.load_nn_from_prev_inference:
-        inference = previous_inferences_specific
-    else:
-        inference = method(prior=prior, density_estimator=dens_estim)
-
-    _ = inference.append_simulations(theta, x).train(
-        max_num_epochs=cfg.max_num_epochs,
-        training_batch_size=cfg.training_batch_size,
-        stop_after_epochs=cfg.stop_after_epochs,
-        force_first_round_loss=True,
+def load_pyloric_posterior_from_file(path, round_):
+    log.info("loading posterior which had been pretrained on 100k!!!!")
+    base = "/mnt/qb/macke/mdeistler57/tsnpe_collection/l5pc/results/p31_2/multiround"
+    with open(join(base, path, f"inference_r{round_}.pkl"), "rb") as handle:
+        inferences = dill.load(handle)
+    xo = torch.as_tensor(
+        [
+            1.17085859e03,
+            2.06036434e02,
+            2.14307031e02,
+            4.12842187e02,
+            1.75970382e-01,
+            1.83034085e-01,
+            3.52597820e-01,
+            4.11600328e-01,
+            6.30544893e-01,
+            4.81925781e02,
+            2.56353125e02,
+            2.75164844e02,
+            4.20460938e01,
+            2.35011166e-01,
+            3.59104797e-02,
+            2.5,
+            2.5,
+            2.5,
+        ]
     )
-    log.info(f"_best_val_log_prob {inference._best_val_log_prob}")
-    return inference
+    xo = xo.unsqueeze(0)
+    log.info(f"xo {xo.shape}")
+    posteriors = [infer.build_posterior() for infer in inferences]
+    ensemble_post = NeuralPosteriorEnsemble(posteriors=posteriors).set_default_x(xo)
+    return ensemble_post, inferences
 
 
 if __name__ == "__main__":
