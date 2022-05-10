@@ -104,10 +104,10 @@ def simulate_mp(cfg, round_):
             log.info("Setting posterior as proposal")
             proposal = posterior
 
-    log.info(f"num_to_simulate", cfg.sims_per_round)
+    log.info(f"num_to_simulate {cfg.sims_per_round}")
     theta = proposal.sample((cfg.sims_per_round,))
 
-    log.info(f"prior of proposal: {proposal._prior}")
+    # log.info(f"prior of proposal: {proposal._prior}")
 
     restricted_prior = load_classifier_prior(wrap=False)
     num_accepted = restricted_prior.predict(theta)
@@ -115,7 +115,7 @@ def simulate_mp(cfg, round_):
         f"Fraction of accepted posterior samples: {torch.sum(num_accepted) / theta.shape[0]}"
     )
 
-    log.info(f"Sampled proposal", theta.shape)
+    log.info(f"Sampled proposal {theta.shape}")
     if isinstance(theta, torch.Tensor):
         prior_pd = create_prior()
         sss = prior_pd.sample((1,))
@@ -208,6 +208,7 @@ def train(cfg, round_):
 
     if round_ > 1 or cfg.retrain_first_round:
         if cfg.parallel_training:
+            raise NotImplementedError
             inferences = Parallel(n_jobs=cfg.ensemble_size)(
                 delayed(train_given_seed)(
                     cfg,
@@ -229,9 +230,10 @@ def train(cfg, round_):
                 if round_ > 1:
                     inference = previous_inferences[seed]
                 else:
+                    log.info(f"dens_estim {dens_estim}")
                     log.info(f"Initializiating SNPE with prior {prior}")
                     inference = SNPE(prior=prior, density_estimator=dens_estim)
-
+                log.info(f"train_proposal {train_proposal}")
                 _ = inference.append_simulations(
                     theta, x, proposal=train_proposal
                 ).train(
@@ -243,6 +245,7 @@ def train(cfg, round_):
                 inferences.append(inference)
                 log.info(f"_best_val_log_prob {inference._best_val_log_prob}")
     else:
+        raise NotImplementedError
         log.info("Loading first round inference from file.")
         pa = "/mnt/qb/macke/mdeistler57/tsnpe_collection/l5pc/results/p31_2/multiround"
         with open(join(pa, "2022_05_04__08_18_59/inference_r1.pkl"), "rb") as handle:
@@ -276,13 +279,15 @@ def evaluate(cfg, round_):
     batches = np.array_split(theta, num_splits)
     batches = [b.iloc[0] for b in batches]
 
-    theta_torch = posterior.sample((10000,))
-    restricted_prior = load_classifier_prior(wrap=False)
-    num_accepted = restricted_prior.predict(theta_torch)
-    log.info(f"Number of accepted posterior samples: {torch.sum(num_accepted)}")
+    # theta_test = posterior.sample((10000,))
+    # restricted_prior = load_classifier_prior(wrap=False)
+    # num_accepted = restricted_prior.predict(theta_test)
+    # log.info(f"Number of accepted posterior samples: {torch.sum(num_accepted)}")
 
+    log.info("Starting to simulate in evaluate()")
     with Pool(cfg.cores) as pool:
         x_list = pool.map(simulate, batches)
+    log.info("Finished simulation in evaluate()")
 
     stats = pd.concat([summary_stats(xx) for xx in x_list])
     stats = stats.to_numpy()
@@ -394,7 +399,7 @@ def load_pyloric_posterior(round_):
 
 
 def load_pyloric_posterior_from_file(path, round_):
-    log.info("loading posterior which had been pretrained on 100k!!!!")
+    log.info("loading posterior which had been trained in another folder!!!!")
     base = "/mnt/qb/macke/mdeistler57/tsnpe_collection/l5pc/results/p31_2/multiround"
     with open(join(base, path, f"inference_r{round_}.pkl"), "rb") as handle:
         inferences = dill.load(handle)

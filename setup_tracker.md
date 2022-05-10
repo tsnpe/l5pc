@@ -217,9 +217,12 @@ path: 2022_05_06__13_50_43_snpe
 evaluation: 2022_05_06__14_50_41__multirun
 
 R5:
-path: 
-evaluation: 
+path: 2022_05_07__08_17_53_snpe
+evaluation: 2022_05_07__10_21_21__multirun
 
+R6:
+path: 2022_05_08__08_59_11_snpe
+evaluation: 2022_05_08__11_19_07__multirun
 
 
 
@@ -253,5 +256,18 @@ R21-30: 2022_05_05__12_38_36__multirun
 
 
 2022_05_06__13_08_05__multirun are the three NPE runs
-
 2022_05_06__16_08_24__multirun TSNPE round 1-5
+2022_05_06__23_20_06__multirun TSNPE round 6-30
+2022_05_07__11_14_52__multirun APT round 1-5
+2022_05_07__13_24_05__multirun APT round 6-15
+2022_05_08__01_16_31__multirun APT round 16-22
+2022_05_09__20_30_14__multirun APT round 22-26
+
+
+2022_05_07__14_27_43__multirun R1-5 with APT and MAF as density estimator
+
+2022_05_07__16_22_43__multirun R1-3 with APT and NSF and no sigmoid transform
+2022_05_07__20_10_21__multirun R1-10 with APT and NSF and no sigmoid transform
+
+<!-- 2022_05_08__10_13_49__multirun R1-5 APT NSF but 30k per round -->
+
