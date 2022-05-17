@@ -98,7 +98,7 @@ def get_replacement_vals_pyloric(
     batch: int, x_dim: int, stds_outside_data: float
 ) -> np.ndarray:
     x_r0 = pd.read_pickle(
-        "/mnt/qb/macke/mdeistler57/tsnpe_collection/l5pc/results/p31_0/simulations/2022_04_29__12_24_12_pyloric_m/0/sims_x.pkl"
+        "/mnt/qb/macke/mdeistler57/tsnpe_collection/l5pc/results/p31_4/prior_predictives_energy_paper/all_simulation_outputs.pkl"
     )
     x_r0 = as_tensor(np.asarray(x_r0), dtype=float32)
     x_r1_np = x_r0.numpy()

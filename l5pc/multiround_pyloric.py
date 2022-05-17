@@ -58,7 +58,7 @@ def multiround(cfg: DictConfig) -> None:
 
 def simulate_mp(cfg, round_):
     start_time = time.time()
-    prior = load_classifier_prior()
+    prior = create_prior().numerical_prior
     sim_and_stats = assemble_pyloric()
 
     log.info(f"Assembled! {time.time() - start_time}")
@@ -95,6 +95,7 @@ def simulate_mp(cfg, round_):
                 allowed_false_negatives=cfg.allowed_false_negatives,
                 use_constrained_prior=cfg.use_constrained_prior,
                 constrained_prior_quanitle=cfg.constrained_prior_quanitle,
+                sampling_method=cfg.sampling_method,
             )
             _, acceptance_rate = proposal.sample((10,), return_acceptance_rate=True)
             log.info(f"Acceptance rate of support proposal: {acceptance_rate}")
@@ -108,12 +109,6 @@ def simulate_mp(cfg, round_):
     theta = proposal.sample((cfg.sims_per_round,))
 
     # log.info(f"prior of proposal: {proposal._prior}")
-
-    restricted_prior = load_classifier_prior(wrap=False)
-    num_accepted = restricted_prior.predict(theta)
-    log.info(
-        f"Fraction of accepted posterior samples: {torch.sum(num_accepted) / theta.shape[0]}"
-    )
 
     log.info(f"Sampled proposal {theta.shape}")
     if isinstance(theta, torch.Tensor):
@@ -174,7 +169,7 @@ def train(cfg, round_):
     log.info(f"Round: {round_}")
 
     if round_ == 1:
-        path = "/mnt/qb/macke/mdeistler57/tsnpe_collection/l5pc/results/p31_2/prior_predictives_energy_paper"
+        path = "/mnt/qb/macke/mdeistler57/tsnpe_collection/l5pc/results/p31_4/prior_predictives_energy_paper"
         theta = pd.read_pickle(join(path, "all_circuit_parameters.pkl"))
         x = pd.read_pickle(join(path, "all_simulation_outputs.pkl"))
         log.info(f"Pre-loaded {len(x)} simulations from file.")
@@ -188,7 +183,7 @@ def train(cfg, round_):
     theta = theta[: cfg.num_initial]
     x = x[: cfg.num_initial]
 
-    prior = load_classifier_prior()
+    prior = create_prior().numerical_prior
 
     log.info(f"theta dim after loading id: {theta.shape}")
     log.info(f"x dim after loading id: {x.shape}")
@@ -241,6 +236,7 @@ def train(cfg, round_):
                     training_batch_size=cfg.training_batch_size,
                     stop_after_epochs=cfg.stop_after_epochs,
                     force_first_round_loss=True,
+                    num_atoms=cfg.num_atoms,
                 )
                 inferences.append(inference)
                 log.info(f"_best_val_log_prob {inference._best_val_log_prob}")
@@ -278,11 +274,6 @@ def evaluate(cfg, round_):
     num_splits = cfg.num_predictives
     batches = np.array_split(theta, num_splits)
     batches = [b.iloc[0] for b in batches]
-
-    # theta_test = posterior.sample((10000,))
-    # restricted_prior = load_classifier_prior(wrap=False)
-    # num_accepted = restricted_prior.predict(theta_test)
-    # log.info(f"Number of accepted posterior samples: {torch.sum(num_accepted)}")
 
     log.info("Starting to simulate in evaluate()")
     with Pool(cfg.cores) as pool:
@@ -350,20 +341,21 @@ def train_given_seed(
         training_batch_size=cfg.training_batch_size,
         stop_after_epochs=cfg.stop_after_epochs,
         force_first_round_loss=True,
+        num_atoms=cfg.num_atoms,
     )
     log.info(f"_best_val_log_prob {inference._best_val_log_prob}")
     return inference
 
 
-def load_classifier_prior(wrap: bool = True):
-    with open(
-        "/mnt/qb/macke/mdeistler57/tsnpe_collection/l5pc/results/pyloric_restricted_prior.pkl",
-        "rb",
-    ) as handle:
-        classifier = pickle.load(handle)
-    if wrap:
-        classifier, _, _ = process_prior(classifier)
-    return classifier
+# def load_classifier_prior(wrap: bool = True):
+#     with open(
+#         "/mnt/qb/macke/mdeistler57/tsnpe_collection/l5pc/results/pyloric_restricted_prior.pkl",
+#         "rb",
+#     ) as handle:
+#         classifier = pickle.load(handle)
+#     if wrap:
+#         classifier, _, _ = process_prior(classifier)
+#     return classifier
 
 
 def load_pyloric_posterior(round_):
@@ -400,7 +392,7 @@ def load_pyloric_posterior(round_):
 
 def load_pyloric_posterior_from_file(path, round_):
     log.info("loading posterior which had been trained in another folder!!!!")
-    base = "/mnt/qb/macke/mdeistler57/tsnpe_collection/l5pc/results/p31_2/multiround"
+    base = "/mnt/qb/macke/mdeistler57/tsnpe_collection/l5pc/results/p31_4/multiround"
     with open(join(base, path, f"inference_r{round_}.pkl"), "rb") as handle:
         inferences = dill.load(handle)
     xo = torch.as_tensor(

@@ -271,3 +271,36 @@ R21-30: 2022_05_05__12_38_36__multirun
 
 <!-- 2022_05_08__10_13_49__multirun R1-5 APT NSF but 30k per round -->
 
+Results with "full" prior and transformed:
+2022_05_10__18_11_09__multirun R1-6 with APT with 10 atoms
+
+2022_05_11__08_30_42__multirun R1-10 with TSNPE allowed_false_negatives=0.0001
+2022_05_11__14_09_04__multirun R1-15 with TSNPE allowed_false_negatives=0.001 (running on cpu-short)
+2022_05_11__20_45_54__multirun R16-40 with TSNPE allowed_false_negatives=0.001 (running on cpu-short)
+2022_05_12__22_08_16__multirun R34-41 with TSNPE allowed_false_negatives=0.001 (running on cpu-short)
+2022_05_13__10_47_43__multirun R42-50 with TSNPE allowed_false_negatives=0.001 (running on cpu-short)
+
+2022_05_11__11_17_11__multirun R1-10 with APT with 2 atoms (running on aroaki)
+2022_05_11__14_21_37           R1-5 with APT with 2 atoms (running on vm-tsnpe)
+2022_05_11__19_01_37           R6-11 with APT with 2 atoms (running on vm-tsnpe)
+2022_05_12__16_02_15__multirun R13-15 with APT with 2 atoms (running on aroaki)
+
+2022_05_13__12_18_39__multirun R1-10 APT 2 atoms, 30k per sim. Do not replace NaN
+2022_05_14__00_06_34__multirun R7-10 APT 2 atoms, 30k per sim. Do not replace NaN
+
+2022_05_14__00_13_47__multirun R1-6 APT 2 atoms, 30k per round. Replace NaN
+2022_05_14__13_21_13__multirun R7-10 APT 2 atoms, 30k per round. Replace NaN
+2022_05_14__23_49_35__multirun R11-13, APT 2 atoms, 30k per round. Replace NaN
+2022_05_15__18_15_26__multirun R14-15, APT 2 atoms, 30k per round. Replace NaN
+
+2022_05_14__11_14_07__multirun TSNPE R1-4 30k per round. Replace NaN
+2022_05_15__21_20_01__multirun TSNPE R5-8 30k per round. Replace NaN. Running on cpu-short
+2022_05_16__08_23_07__multirun TSNPE R9-12 30k per round. Replace NaN. Running on cpu-short
+
+2022_05_16__08_53_55__multirun TSNPE R1-7 30k per round. Replace NaN. Rejection sampling
+2022_05_16__19_37_53__multirun TSNPE R8-8 30k per round. Replace NaN. sir sampling (aroaki)
+2022_05_17__01_40_01__multirun TSNPE R8-10 30k per round. Replace NaN. sir sampling (vm-tsnpe)
+2022_05_17__01_48_28__multirun TSNPE R8-9 30k per round. Replace NaN. rejection sampling (cpu-short)
+
+2022_05_16__11_36_58__multirun APT R1-2, 2 atoms, 30k per round replace NaN, no sigmoid_theta
+2022_05_17__09_36_25__multirun APT R3-4, 2 atoms, 30k per round replace NaN, no sigmoid_theta
