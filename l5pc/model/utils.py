@@ -116,7 +116,7 @@ def return_gt(as_pd: bool = True):
 
 
 def return_xo(summstats: bool = True, as_pd: bool = True):
-    model_path = "/mnt/qb/macke/mdeistler57/multicompartment/multicompartment/models"
+    model_path = "/home/michael/Documents/multicompartment_collection/multicompartment/multicompartment/models"
     if summstats:
         xo = pd.read_pickle(os.path.join(model_path, "l5pc/xo.pkl"))
         if not as_pd:

@@ -42,7 +42,7 @@ def plot_single_trace_step1(traces, figsize=None):
     return fig, ax
 
 
-def plot_traces(traces, figsize=None, protocol=None, num_traces=10):
+def plot_traces(traces, xo_trace, figsize=None, protocol=None, num_traces=10):
     if protocol is None:
         protocol = [
             "bAP.soma.v",
@@ -58,7 +58,6 @@ def plot_traces(traces, figsize=None, protocol=None, num_traces=10):
     traces = traces[:num_traces]
 
     fig, ax = plt.subplots(num_traces + 1, len(protocol), figsize=figsize)
-    xo_trace = return_xo(summstats=False)[0]
     for i, p in enumerate(protocol):
         _ = ax[0, i].plot(
             xo_trace[p].response["time"].to_numpy(),
@@ -86,6 +85,7 @@ def plot_traces(traces, figsize=None, protocol=None, num_traces=10):
             xo = xo_trace[protocol[j]].response["voltage"].to_numpy()
             ax[i + 1, j].set_ylim([np.min(xo) - 15.0, np.max(xo) + 15.0])
             ax[0, j].set_ylim([np.min(xo) - 15.0, np.max(xo) + 15.0])
+    ax[10, 2].set_xlabel(r"$\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;$Time [ms]")
 
 
 def plot_summstats(posterior_stats, prior_stats, used_features=None):
