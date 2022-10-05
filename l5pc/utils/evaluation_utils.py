@@ -85,7 +85,9 @@ def plot_traces(traces, xo_trace, figsize=None, protocol=None, num_traces=10):
             xo = xo_trace[protocol[j]].response["voltage"].to_numpy()
             ax[i + 1, j].set_ylim([np.min(xo) - 15.0, np.max(xo) + 15.0])
             ax[0, j].set_ylim([np.min(xo) - 15.0, np.max(xo) + 15.0])
-    ax[10, 2].set_xlabel(r"$\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;$Time [ms]")
+    ax[10, 2].set_xlabel(
+        r"$\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;$Time [ms]"
+    )
 
 
 def plot_summstats(posterior_stats, prior_stats, used_features=None):
